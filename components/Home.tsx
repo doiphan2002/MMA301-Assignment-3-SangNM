@@ -5,9 +5,9 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  TextInput,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import Icon from "react-native-vector-icons/MaterialIcons";
@@ -19,6 +19,7 @@ export default function Home({ navigation }) {
   const [filteredData, setFilteredData] = useState([]);
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [ searchText, setSearchText ] = useState(''); 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,13 +27,12 @@ export default function Home({ navigation }) {
         const response = await axios.get(API_URL);
         const products = response.data;
 
-        // Lấy danh sách thương hiệu duy nhất
         const uniqueBrands = [
           ...new Set(products.map((item) => item.brand)),
         ];
         setBrands(uniqueBrands);
         setData(products);
-        setFilteredData(products); // Mặc định hiển thị tất cả sản phẩm
+        setFilteredData(products); 
       } catch (error) {
         console.error("Error fetching products:", error);
       }
@@ -42,15 +42,31 @@ export default function Home({ navigation }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    let results = data;
+
+    if (selectedBrand) {
+      results = results.filter((item) => item.brand === selectedBrand);
+    }
+
+    if (searchText.trim() !== "") {
+      const searchLower = searchText.toLowerCase().trim();
+      results = results.filter(item => 
+        item.artName.toLowerCase().includes(searchLower)
+      );
+    }
+    setFilteredData(results);
+  }, [selectedBrand, searchText, data])
+
   const filterByBrand = (brand) => {
     if (brand === selectedBrand) {
       setSelectedBrand(null);
-      setFilteredData(data); // Hiển thị lại tất cả sản phẩm nếu nhấn lại thương hiệu đã chọn
     } else {
       setSelectedBrand(brand);
-      setFilteredData(data.filter((item) => item.brand === brand));
     }
   };
+
+  
 
   const toggleFavorite = async (
     id,
@@ -96,15 +112,21 @@ export default function Home({ navigation }) {
   };
 
   const calculateDiscountPercent = (price, limitedTimeDeal) => {
-    if (limitedTimeDeal && limitedTimeDeal < price) {
-      return Math.round(((price - limitedTimeDeal) / price) * 100);
+    if (limitedTimeDeal && limitedTimeDeal > 0 && limitedTimeDeal < 1) {
+      return Math.round(limitedTimeDeal * 100);
     }
     return 0;
   };
 
+  const calculateDiscountedPrice = (price, discountPercent) => {
+    if (discountPercent && discountPercent > 0 && discountPercent < 1) {
+      return (price * (1 - discountPercent)).toFixed(2);
+    }
+    return price.toFixed(2);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Danh sách các thương hiệu */}
       <View style={styles.brandContainer}>
         <FlatList
           horizontal
@@ -132,7 +154,22 @@ export default function Home({ navigation }) {
         />
       </View>
 
-      {/* Danh sách sản phẩm */}
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Tìm kiếm sản phẩm..."
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchText("")}>
+            <Icon name="close" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      
       <FlatList
         data={filteredData}
         numColumns={2}
@@ -143,8 +180,9 @@ export default function Home({ navigation }) {
             item.limitedTimeDeal
           );
           const hasDiscount = discountPercent > 0;
+          const discountedPrice = calculateDiscountedPrice(item.price, item.limitedTimeDeal);
           return (
-            <View style={{ flex: 1, padding: 8, maxWidth: "50%" }}>
+            <View style={{ flex: 1, padding: 10, maxWidth: "50%" }}>
               <View style={styles.itemContainer}>
                 <TouchableOpacity
                   onPress={() => navigation.navigate("Detail", { id: item.id })}
@@ -154,6 +192,7 @@ export default function Home({ navigation }) {
                       <Image
                         style={styles.image}
                         source={{ uri: item.image }}
+                        resizeMode="contain" 
                       />
                     </View>
                     <View style={styles.favoriteContainer}>
@@ -179,7 +218,7 @@ export default function Home({ navigation }) {
                 </TouchableOpacity>
 
                 <View style={styles.productNameContainer}>
-                  <Text>{item.artName}</Text>
+                  <Text numberOfLines={2}>{item.artName}</Text>
                 </View>
                 <Text
                   style={[
@@ -191,10 +230,8 @@ export default function Home({ navigation }) {
                 </Text>
                 {hasDiscount && (
                   <View style={styles.discountContainer}>
-                    <Text style={styles.limitedTimeDeal}>
-                      {item.limitedTimeDeal}$
-                    </Text>
                     <Text style={styles.discountText}>{discountPercent}%</Text>
+                    <Text style={styles.limitedTimeDeal}>{discountedPrice}$</Text>
                   </View>
                 )}
               </View>
@@ -234,11 +271,30 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    height: 40,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+  },
   itemContainer: {
     alignItems: "center",
     backgroundColor: "#f9f9f9",
     borderRadius: 10,
-    padding: 10,
+    padding: 8,
+    marginBottom: 10,
+    height: 270,
   },
   imageContainer: {
     width: 150,
@@ -259,7 +315,7 @@ const styles = StyleSheet.create({
   productNameContainer: {
     width: "auto",
     marginVertical: 10,
-  },
+  }, 
   price: {
     fontSize: 16,
     color: "black",
@@ -272,6 +328,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 5,
+    gap: 5,
   },
   limitedTimeDeal: {
     fontSize: 16,

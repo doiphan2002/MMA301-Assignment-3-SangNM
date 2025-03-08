@@ -51,6 +51,20 @@ export default function Detail({ route, navigation }) {
     }
   };
 
+  const calculateDiscountPercent = (price, limitedTimeDeal) => {
+    if (limitedTimeDeal && limitedTimeDeal > 0 && limitedTimeDeal < 1) {
+      return Math.round(limitedTimeDeal * 100);
+    }
+    return 0;
+  };
+
+  const calculateDiscountedPrice = (price, discountPercent) => {
+    if (discountPercent && discountPercent > 0 && discountPercent < 1) {
+      return (price * (1 - discountPercent)).toFixed(2);
+    }
+    return price.toFixed(2);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -67,6 +81,10 @@ export default function Detail({ route, navigation }) {
     );
   }
 
+  const discountPercent = calculateDiscountPercent(product.price, product.limitedTimeDeal);
+  const hasDiscount = discountPercent > 0;
+  const discountedPrice = calculateDiscountedPrice(product.price, product.limitedTimeDeal);
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container}>
@@ -75,7 +93,7 @@ export default function Detail({ route, navigation }) {
         <Text style={styles.backText}>Back to Home</Text>
         </TouchableOpacity>
         <View style={styles.imageContainer}>
-          <Image source={{ uri: product.image }} style={styles.image} />
+          <Image source={{ uri: product.image }} style={styles.image} resizeMode="contain" />
           <TouchableOpacity onPress={toggleFavorite} style={styles.favoriteButton}>
             <Icon name={isFavorite ? 'favorite' : 'favorite-outline'} size={28}  />
           </TouchableOpacity>
@@ -84,7 +102,19 @@ export default function Detail({ route, navigation }) {
         <View style={styles.detailsContainer}>
           <Text style={styles.name}>{product.artName}</Text>
           <Text style={styles.description}>{product.description}</Text>
-          <Text style={styles.price}>{product.price} đ</Text>
+
+          <View style={styles.priceContainer}>
+            <Text style={[styles.price, hasDiscount && styles.priceStrikethrough]}>
+              {product.price} $
+            </Text>
+            
+            {hasDiscount && (
+              <View style={styles.discountContainer}>
+                <Text style={styles.discountText}>{discountPercent}%</Text>
+                <Text style={styles.discountedPrice}>{discountedPrice} $</Text>
+              </View>
+            )}
+          </View>
         </View>
 
       <Text style={styles.feedbackTitle}>Feedback</Text>
@@ -170,12 +200,35 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 5,
   },
+  priceContainer: {
+    alignItems: "center",
+    marginTop: 10,
+  },
   price: {
     fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
+    color: "#333",
+  },
+  priceStrikethrough: {
+    textDecorationLine: "line-through",
+    color: "gray",
+    fontWeight: "normal",
+  },
+  discountContainer: {
+    flexDirection: "column",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  discountText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "green",
+    marginBottom: 2,
+  },
+  discountedPrice: {
+    fontSize: 24,
+    fontWeight: "bold",
     color: "#ff6347",
-    marginTop: 10,
   },
   loadingContainer: {
     flex: 1,
